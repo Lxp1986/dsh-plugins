@@ -8,6 +8,7 @@ import path from 'node:path';
 
 const BASE = process.env.OW_BASE || 'http://127.0.0.1:19387/office-workbench';
 const python = process.env.DSH_OFFICE_PYTHON || path.join(os.homedir(), '.dsh/dsh-runtimes/dsh-primary-runtime/dependencies/python/bin/python3');
+const prefix = '验收'; // 会先清掉工作台里遗留的同名前缀文档，保证脚本可重复运行
 const build = `
 import os
 from docx import Document
@@ -49,13 +50,25 @@ try {
   const listed = await api('/api/documents');
   assert.equal(listed.status, 200, `GET /api/documents → ${listed.status} ${JSON.stringify(listed.payload)}`);
 
+  // 上次异常中断可能留下同名文档，先清干净（导入接口遇到重名会 500）。
+  const existing = Array.isArray(listed.payload) ? listed.payload : listed.payload?.documents || [];
+  for (const doc of existing) {
+    if (String(doc.name ?? '').startsWith(prefix)) {
+      await api(`/api/document?id=${encodeURIComponent(doc.id)}`, { method: 'DELETE' });
+    }
+  }
+
   execFileSync(python, ['-c', build], { env: { ...process.env, FIXTURES: root } });
   const imports = {};
   for (const name of ['验收.docx', '验收.xlsx', '验收.pptx']) {
     const res = await post('/api/import-office', { name, base64: (await readFile(path.join(root, name))).toString('base64') });
     assert.equal(res.status, 200, `import-office(${name}) → ${res.status} ${JSON.stringify(res.payload)}`);
-    assert.ok(res.payload.office?.appendItems?.length, `${name} 缺少 appendItems（宿主仍在跑旧宿主插件代码）`);
-    imports[name] = res.payload; made.push(res.payload.id);
+    // 先登记再断言：断言失败时 finally 仍能删掉刚导入的文档。
+    made.push(res.payload.id);
+    imports[name] = res.payload;
+    // PPTX 故意不提供 appendItems（幻灯片追加段落的目标不明确），只有 DOCX/XLSX 有追加项。
+    if (name.endsWith('.pptx')) assert.equal(res.payload.office?.kind, 'presentation');
+    else assert.ok(res.payload.office?.appendItems?.length, `${name} 缺少 appendItems（宿主仍在跑旧宿主插件代码）`);
   }
 
   const docx = imports['验收.docx'];
