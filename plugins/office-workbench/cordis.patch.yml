@@ -3,3 +3,5 @@
       name: '@local/dsh-office-workbench'
       config:
         dataRoot: !!js dshHomePath('office-workbench')
+        # 就地编辑交给哪个应用（macOS 用 `open -a`，可填 ONLYOFFICE / Microsoft Word / Pages…）
+        externalApp: ONLYOFFICE

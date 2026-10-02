@@ -14,11 +14,22 @@
 - 显式保存，非自动保存。Office 保存检查读取时的 updatedAt，避免常见的 Agent/手动编辑旧版本覆盖；修改后需重载才看到 Agent 的最新内容。
 - 文件上限 8 MiB、解压包总量上限 100 MiB、处理超时 30 秒。
 
+## 与本地 Office 应用联动（就地编辑）
+
+结构化编辑只覆盖文字；图片、图表、表格样式、版式这类改动交给本机编辑器。
+
+- 工作台把文档副本导出到 `<数据目录>/external/`，再调用本机应用打开（macOS 走 `open -a`，默认 `ONLYOFFICE`，可用 `cordis.patch.yml` 的 `externalApp` 改）。只在用户点击时导出，不碰工作台以外的文件。
+- 编辑器里保存后，工作台按文件 mtime 判定「待同步」；点「同步外部修改」，或面板 4 秒轮询在无本地未保存改动时自动收回。收回先过 OOXML 校验，再原子替换工作台副本并刷新 `updatedAt`，Agent 立刻能读到新内容。
+- 本地已有未同步修改时拒绝再次导出，避免把工作台里的旧版本盖掉编辑器里的成果。
+- 交给编辑器的是副本，用户原文件不受影响。
+
 ## Agent 工具
 
-`office_list_documents`、`office_read_document`、`office_save_document`、`office_delete_document`、`office_update_office`。
+`office_list_documents`、`office_read_document`、`office_save_document`、`office_delete_document`、`office_update_office`、`office_open_in_app`、`office_sync_back`。
 
 Office 更新：先读取获取 `office.items`、`office.appendItems` 和 `updatedAt`，再提交 `{id, expectedUpdatedAt, edits: [{key, text}]}`。只提交改变的项。`appendItems` 提供「新增段落」「新增行（Tab 分隔单元格）」的 key，text 非空时在末尾追加。文本工具不能将字符串伪装保存为 Office 文件。
+
+就地编辑：`office_open_in_app` 把文档交给本机应用打开，`office_sync_back` 把编辑器保存的改动收回工作台。
 
 ## 运行依赖与安装
 
@@ -33,6 +44,9 @@ Office Python 默认为 `~/.dsh/dsh-runtimes/dsh-primary-runtime/dependencies/py
 - store.test.mjs：文本 CRUD、路径/类型/大小限制通过。
 - client.test.mjs：模块加载与面板/侧栏注册通过。
 - office-roundtrip.test.mjs：用 python-docx/openpyxl/python-pptx 生成真实 DOCX/XLSX/PPTX，验证页眉/页脚、备注页编辑与新增段落/新增行，再由同一批库独立解析输出，全部通过。
-- plugin.test.mjs：五个工具注册、原生工具 CRUD、HTTP 文档列表、注销清理通过。
+- plugin.test.mjs：七个工具注册、原生工具 CRUD、HTTP 文档列表、注销清理通过。
 - host-acceptance.mjs：面向**运行中宿主**的完整链路验收（导入 → 编辑 → 保存 → 导出 → 独立解析）。宿主插件代码改动后必须完整重启 DSH；重启前该脚本按预期在 `/api/import-office` 得到 404，证明 live Host 仍在跑旧模块。
-- 管理器安装返回 restart-required；重启前 live Host 仍是旧模块，新增 HTTP 路由返回 404。原生 Agent 子 slot 已在 Client Inspect 注册；实际页面交互与插件/skill 调用还需重启后的端到端验收。
+- external.test.mjs：假 launch 走完「交接 → 无改动 → 收回 → 段落与 updatedAt 更新 → 不重复计数 → 未同步保护 → 再次交接」。
+- app-handoff-manual.mjs：**真实**拉起 ONLYOFFICE 的完整链路验收（手动运行，不在 `node --test test/*.test.mjs` 通配内），实测输出：交接到 `<临时目录>/external/就地编辑验收.docx` → 进程 `/Applications/ONLYOFFICE.app/Contents/MacOS/ONLYOFFICE` 在跑、外部文件 36606 字节、待同步=false → 模拟编辑器保存后待同步=true → 收回 `changed=true`、段落 `["原始正文","在编辑器里新增的一段"]` → `updatedAt` 2026-10-02T19:52:48.929Z → 2026-10-02T19:52:54.209Z。
+- 已知回归由 store.test.mjs 拦下：`locate` 重构一度丢失 `../` 越界校验（先取 basename 再判边界），已改为先校验原始 id 再取文件名。
+- 管理器安装返回 restart-required；重启前 live Host 仍是旧模块，新增 HTTP 路由返回 404（本次实测 `/api/pull-external`、`/api/external-status` 均 404）。原生 Agent 子 slot 已在 Client Inspect 注册；实际页面交互与插件/skill 调用还需重启后的端到端验收。
