@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+const registrations = [], injections = []; let loaded;
+globalThis.window = { __ModuleLoader__: { load(entry) { loaded = entry; } } };
+globalThis.document = { baseURI: 'http://127.0.0.1:19387/', head: { appendChild() {} }, createElement() { return { dataset: {}, remove() {} }; } };
+await import(pathToFileURL(path.join(import.meta.dirname, '..', 'client.js')).href);
+assert.equal(loaded.id, '@local/dsh-office-workbench');
+const React = { createElement: (type, props, ...children) => ({ type, props, children }), Fragment: Symbol('Fragment'), useState: (x) => [x, () => {}], useEffect() {}, useCallback: (fn) => fn };
+const plugin = loaded.factory((name) => { assert.equal(name, 'react'); return React; });
+const ctx = { effect(fn) { fn(); }, slots: { inject(key, fn) { injections.push(key); fn(); }, register(options, component) { registrations.push({ options, component }); } } };
+plugin.apply(ctx);
+assert.deepEqual(injections.sort(), ['main', 'sidebar.panellist']);
+assert.ok(registrations.some(({ options }) => options.key === 'office-workbench'));
+assert.ok(registrations.some(({ options }) => options.id === 'office-workbench'));
+console.log('client.test: module loader, panel slot and sidebar registration passed');

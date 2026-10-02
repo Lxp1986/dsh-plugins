@@ -1,0 +1,32 @@
+{
+  "name": "@local/dsh-office-workbench",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "独立办公工作台：文档编辑与原生 DSH Agent 协作",
+  "icon": "./icon.svg",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json",
+    "./cordis.patch.yml": "./cordis.patch.yml"
+  },
+  "license": "MIT",
+  "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-sidebar",
+        "@deepseek-ai/dsh-client-ui-conversation"
+      ]
+    }
+  },
+  "meta": {
+    "title": "办公工作台",
+    "description": "手动编辑文档，并使用 DSH 原生 Agent 处理工作区文档"
+  }
+}

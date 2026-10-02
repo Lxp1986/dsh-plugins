@@ -9,10 +9,13 @@
 | 插件 | 说明 | 依赖 |
 |---|---|---|
 | [**video-studio**](plugins/video-studio/) | 剪映式视频剪辑工作台：多轨时间线、**自动字幕**（本地 SenseVoice，离线）、**自动配音**（macOS `say`）、BGM、字幕样式、一键导出 1080p H.264 | `ffmpeg`（含 libass）、macOS `say`、DSH 内置语音识别包 |
+| [**office-workbench**](plugins/office-workbench/) | 独立办公工作台：编辑 Markdown/TXT/CSV/HTML/JSON 文档，并通过 DSH 原生 Agent 工具协作 | DSH |
 
 video-studio 同时提供**完整 Web 面板**（DSH 侧栏「剪辑工作台」）和 **7 个 Agent 工具**
 （`video_studio_status` / `project` / `media` / `subtitles` / `dub` / `render` / `job`），
 所以既能自己点着剪，也能让 Agent 替你剪。
+
+office-workbench 提供**独立文档工作台**（DSH 侧栏「办公工作台」）与文档 CRUD Agent 工具；当前 MVP 以文本文档为主，不宣称兼容完整 WPS 排版格式。
 
 ## 安装插件
 
@@ -34,6 +37,8 @@ plugin_manager install_bundle("/绝对路径/dsh-plugins/plugins/video-studio")
 3. 把 `@local/dsh-video-studio` 加进同一个 `package.json` 的 `dsh.profile.bundles`
 4. 在该 profile 目录执行 `pnpm install`
 5. **重启 DSH**（宿主插件代码只在进程启动时导入一次）
+
+office-workbench 安装时使用 `@local/dsh-office-workbench`，链接值改为 `link:/绝对路径/dsh-plugins/plugins/office-workbench`，并将该包名加入 `dsh.profile.bundles`。其 `cordis.patch.yml` 已提供默认 `$DSH_HOME/office-workbench` 数据根；Host 工具首次注册须重启 DSH。
 
 **配置覆盖**（可选）写进 profile 的 `cordis.patch.yml`：
 
@@ -57,7 +62,8 @@ dsh-plugins/
 ├── README.md               本文件：索引 + 通用安装说明
 ├── LICENSE
 └── plugins/
-    └── video-studio/       一个插件 = 一个自带 package.json 的目录
+    ├── video-studio/       一个插件 = 一个自带 package.json 的目录
+    └── office-workbench/   文本文档工作台与 DSH Agent 文档工具
         ├── package.json    必须声明 dsh.bundle.patch（可选 dsh.client）
         ├── cordis.patch.yml 往宿主插入插件行
         ├── index.js        宿主入口：export name / inject / apply(ctx, config)
