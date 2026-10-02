@@ -14,8 +14,9 @@ const ctx = {
 try {
   apply(ctx, { dataRoot: root });
   await new Promise((r) => setTimeout(r, 20));
-  assert.deepEqual([...tools.keys()].sort(), ['office_delete_document', 'office_list_documents', 'office_read_document', 'office_save_document', 'office_update_office']);
+  assert.deepEqual([...tools.keys()].sort(), ['office_delete_document', 'office_list_documents', 'office_open_in_app', 'office_read_document', 'office_save_document', 'office_sync_back', 'office_update_office']);
   assert.match(tools.get('office_update_office').description, /appendItems/);
+  assert.match(tools.get('office_open_in_app').description, /ONLYOFFICE/);
   assert.ok(routes.has('/office-workbench'));
   const save = tools.get('office_save_document');
   await save.execute({ name: 'Agent 草稿.md', content: '由 Agent 写入' });

@@ -1,7 +1,7 @@
 const obj = (properties, required = []) => ({ type: 'object', additionalProperties: false, properties, ...(required.length ? { required } : {}) });
 const render = (_args, value) => [{ type: 'text', text: `${JSON.stringify(value, null, 2)}\n` }];
 
-export function registerTools(ctx, store) {
+export function registerTools(ctx, store, external) {
   const disposers = [];
   const register = (definition) => disposers.push(ctx.tools.register({ ...definition, async execute(args, exec) { return await definition.execute(args, exec); } }));
   register({
@@ -33,10 +33,24 @@ export function registerTools(ctx, store) {
   });
   register({
     name: 'office_update_office',
-    description: '更新 docx/xlsx/pptx 的段落、单元格、幻灯片或备注文字。必须先 office_read_document 获取 office.items 与 office.appendItems 的 key 和 updatedAt。可编辑正文/页眉/页脚段落、幻灯片与备注段落、工作表单元格；office.appendItems 提供「新增段落」「新增行（Tab 分隔单元格）」的 key，text 非空时在末尾追加。只提交变化项；未修改的媒体与 XML 保留，修改段落沿用首个 run 样式。',
+    description: '更新 docx/xlsx/pptx 的段落、单元格、幻灯片或备注文字。必须先 office_read_document 获取 office.items 与 office.appendItems 的 key 和 updatedAt。可编辑正文/页眉/页脚段落、幻灯片与备注段落、工作表单元格；office.appendItems 提供「新增段落」「新增行（Tab 分隔单元格）」的 key，text 非空时在末尾追加。只提交变化项；未修改的媒体与 XML 保留，修改段落沿用首个 run 样式。图片、图表、版式等改动请改用 office_open_in_app。',
     parameters: obj({ id: { type: 'string' }, expectedUpdatedAt: { type: 'string' }, edits: { type: 'array', items: obj({ key: { type: 'string' }, text: { type: 'string' } }, ['key', 'text']) } }, ['id', 'expectedUpdatedAt', 'edits']),
     output: { schema: { type: 'object', additionalProperties: true }, render },
     async execute(args) { return await store.saveOffice(args); },
+  });
+  register({
+    name: 'office_open_in_app',
+    description: '把 docx/xlsx/pptx 落到本地目录并交给本机办公应用（默认 ONLYOFFICE）打开做完整保真编辑——图片、图表、表格、版式都可用。用户保存后调用 office_sync_back 把改动收回工作台。',
+    parameters: obj({ id: { type: 'string', description: '精确文档文件名/id' } }, ['id']),
+    output: { schema: { type: 'object', additionalProperties: true }, render },
+    async execute(args) { return await external.open(args.id); },
+  });
+  register({
+    name: 'office_sync_back',
+    description: '把本地应用里保存后的 Office 文档改动同步回办公工作台（先校验为合法 OOXML 再原子替换，并刷新 updatedAt）。返回 changed=false 表示外部文件没有新改动。',
+    parameters: obj({ id: { type: 'string', description: '精确文档文件名/id' } }, ['id']),
+    output: { schema: { type: 'object', additionalProperties: true }, render },
+    async execute(args) { return await external.pull(args.id); },
   });
   return () => { for (const dispose of disposers.reverse()) dispose(); };
 }

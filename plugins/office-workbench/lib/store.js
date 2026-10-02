@@ -35,14 +35,22 @@ export function createDocumentStore(root) {
     }
     return docs.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }
-  async function read(id) {
+  // 统一的「id → 工作台内真实文件」解析：越界、类型、体积校验只有一份，读/写/换字节都走它。
+  async function locate(id) {
     const file = path.resolve(documentsDir, String(id || ''));
+    // 先用原始 id 判越界再取 basename：basename 会把 ../ 之类的穿越路径"洗干净"，先洗就漏判了。
     if (!withinRoot(file) || !TEXT_EXTENSIONS.has(path.extname(file).toLowerCase())) throw new Error('文档路径无效');
     const actual = await resolveContained(file);
     const info = await stat(actual);
     if (!info.isFile() || info.size > MAX_DOCUMENT_BYTES) throw new Error('文档不存在或超过 8 MiB');
-    return { id: path.basename(file), name: path.basename(file), path: actual, ...(OFFICE_EXTENSIONS.has(path.extname(file).toLowerCase()) ? { office: await officeProcess(actual) } : { content: await readFile(actual, 'utf8') }), bytes: info.size, updatedAt: info.mtime.toISOString() };
+    return { filename: path.basename(file), actual, info };
   }
+  const isOffice = (filename) => OFFICE_EXTENSIONS.has(path.extname(filename).toLowerCase());
+  async function read(id) {
+    const { filename, actual, info } = await locate(id);
+    return { id: filename, name: filename, path: actual, ...(isOffice(filename) ? { office: await officeProcess(actual) } : { content: await readFile(actual, 'utf8') }), bytes: info.size, updatedAt: info.mtime.toISOString() };
+  }
+  async function bytes(id) { return await readFile((await locate(id)).actual); }
   async function save({ id, name, content }) {
     await init();
     if (typeof content !== 'string') throw new Error('content 必须是文本');
@@ -62,11 +70,9 @@ export function createDocumentStore(root) {
     return read(filename);
   }
   async function remove(id) {
-    const file = path.resolve(documentsDir, String(id || ''));
-    if (!withinRoot(file) || !TEXT_EXTENSIONS.has(path.extname(file).toLowerCase())) throw new Error('文档路径无效');
-    const actual = await resolveContained(file);
+    const { filename, actual } = await locate(id);
     await rm(actual);
-    return { deleted: path.basename(file) };
+    return { deleted: filename };
   }
   async function importOffice({ name, base64 }) {
     await init();
@@ -99,5 +105,22 @@ export function createDocumentStore(root) {
     finally { await rm(temp, { force: true }); }
     return read(id);
   }
-  return { root: documentsDir, init, list, read, save, remove, importOffice, saveOffice };
+  // 外部编辑器（ONLYOFFICE 等）保存后的整包换入：先当成新文件解析校验，再原子替换。
+  async function replaceBytes({ id, buffer, expectedUpdatedAt }) {
+    if (!OFFICE_EXTENSIONS.has(path.extname(String(id)).toLowerCase())) throw new Error('仅支持 docx、xlsx、pptx');
+    if (!Buffer.isBuffer(buffer) || buffer.length === 0) throw new Error('无效文件内容');
+    if (buffer.length > MAX_DOCUMENT_BYTES) throw new Error('文档超过 8 MiB');
+    const doc = await read(id);
+    if (!expectedUpdatedAt || doc.updatedAt !== expectedUpdatedAt) throw new Error('文档已变更，请重新打开后再同步');
+    const temp = path.join(documentsDir, `.${randomUUID()}${path.extname(doc.name)}`);
+    try {
+      await writeFile(temp, buffer, { flag: 'wx', mode: 0o600 });
+      await officeProcess(temp);
+      const info = await stat(doc.path);
+      if (info.mtime.toISOString() !== expectedUpdatedAt) throw new Error('文档已变更，请重新打开后再同步');
+      await rename(temp, doc.path);
+    } finally { await rm(temp, { force: true }); }
+    return read(id);
+  }
+  return { root: documentsDir, init, list, read, bytes, save, remove, importOffice, saveOffice, replaceBytes };
 }

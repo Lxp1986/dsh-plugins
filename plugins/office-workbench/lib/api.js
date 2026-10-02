@@ -15,7 +15,7 @@ function bodyJson(req) {
     req.on('error', reject);
   });
 }
-export function createApi(store) {
+export function createApi(store, external) {
   return async (req, res) => {
     const url = new URL(req.url || '/', 'http://127.0.0.1');
     const route = url.pathname.slice('/office-workbench'.length) || '/';
@@ -26,12 +26,15 @@ export function createApi(store) {
       if (req.method === 'POST' && route === '/api/save-office') return send(res, 200, await store.saveOffice(await bodyJson(req)));
       if (req.method === 'POST' && route === '/api/document') return send(res, 200, await store.save(await bodyJson(req)));
       if (req.method === 'DELETE' && route === '/api/document') return send(res, 200, await store.remove(url.searchParams.get('id')));
+      if (req.method === 'POST' && route === '/api/open-external') return send(res, 200, await external.open((await bodyJson(req)).id));
+      if (req.method === 'GET' && route === '/api/external-status') return send(res, 200, await external.status(url.searchParams.get('id')));
+      if (req.method === 'POST' && route === '/api/pull-external') return send(res, 200, await external.pull((await bodyJson(req)).id));
       if (req.method === 'GET' && route === '/api/export') {
         const document = await store.read(url.searchParams.get('id'));
         res.writeHead(200, { 'content-type': 'application/octet-stream', 'content-disposition': `attachment; filename*=UTF-8''${encodeURIComponent(basename(document.name))}`, 'cache-control': 'no-store' });
         createReadStream(resolve(document.path)).pipe(res); return;
       }
       return send(res, 404, { error: '未知办公工作台接口' });
-    } catch (error) { return send(res, /不存在|无效|不能为空|超过|仅支持|必须/.test(error.message) ? 400 : 500, { error: error.message }); }
+    } catch (error) { return send(res, /不存在|无效|不能为空|超过|仅支持|必须|未同步|还没有/.test(error.message) ? 400 : 500, { error: error.message }); }
   };
 }
