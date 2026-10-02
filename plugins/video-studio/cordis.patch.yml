@@ -1,0 +1,5 @@
+- insert:
+    - id: video-studio
+      name: '@local/dsh-video-studio'
+      config:
+        dataRoot: !!js dshHomePath('video-studio')

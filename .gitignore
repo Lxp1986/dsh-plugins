@@ -1,0 +1,14 @@
+# macOS
+.DS_Store
+
+# dependencies
+node_modules/
+
+# logs / editor / temp
+*.log
+.idea/
+.vscode/
+*.tmp
+
+# local test artifacts (pipeline test writes to the OS temp dir unless KEEP_TEST_DIR=1)
+test-output/

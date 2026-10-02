@@ -1,0 +1,58 @@
+{
+  "name": "@local/dsh-video-studio",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "剪映式视频剪辑工作台：时间线、自动字幕、自动配音、一键渲染导出",
+  "keywords": [
+    "deepseek",
+    "dsh",
+    "dsh-plugin",
+    "video-editor",
+    "video-editing",
+    "ffmpeg",
+    "subtitles",
+    "asr",
+    "tts",
+    "capcut",
+    "timeline"
+  ],
+  "icon": "./icon.svg",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./locale/*.json": "./locale/*.json"
+  },
+  "license": "MIT",
+  "author": "L-XP (https://github.com/Lxp1986)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Lxp1986/dsh-plugins.git",
+    "directory": "plugins/video-studio"
+  },
+  "homepage": "https://github.com/Lxp1986/dsh-plugins/tree/main/plugins/video-studio",
+  "bugs": {
+    "url": "https://github.com/Lxp1986/dsh-plugins/issues"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-sidebar"
+      ]
+    }
+  },
+  "meta": {
+    "title": "Video Studio 剪辑工作台",
+    "description": "时间线剪辑、自动字幕、自动配音与渲染导出"
+  }
+}
